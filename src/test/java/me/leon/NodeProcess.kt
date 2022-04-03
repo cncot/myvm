@@ -90,8 +90,8 @@ class NodeProcess {
 
     /**
      * 上面筛好节点后,进行第三方或者本地节点测速 进行节点分组 测速地址
-     * - http://gz.cloudtest.cc/
-     * - http://a.cloudtest.icu/
+     * - https://www.youtube.com/
+     * - https://www.google.com/
      */
     @Test
     fun availableSpeedTest() {
