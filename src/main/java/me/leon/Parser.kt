@@ -7,13 +7,7 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
-import me.leon.support.b64Decode
-import me.leon.support.b64SafeDecode
-import me.leon.support.fromJson
-import me.leon.support.queryParamMapB64
-import me.leon.support.readFromNet
-import me.leon.support.readText
-import me.leon.support.urlDecode
+import me.leon.support.*
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
 
@@ -21,9 +15,9 @@ private const val UUID_LENGTH = 36
 
 object Parser {
     private val REG_SCHEMA_HASH = "(\\w+)://([^ #]+)(?:#([^#]+)?)?".toRegex()
-    private val REG_SS = "([^:]+):([^@]+)@([^:]+):(\\d{1,5})".toRegex()
+    private val REG_SS = "([^:]+):([^@]+)@([^:]+):(\\d{1,5})/?".toRegex()
     private val REG_SSR_PARAM = "([^/]+)/\\?(.+)".toRegex()
-    private val REG_TROJAN = "([^@]+)@([^:]+):(\\d{1,5})(?:\\?(.+))?".toRegex()
+    private val REG_TROJAN = "([^@]+)@([^:]+):(\\d{1,5})/?(?:\\?(.+))?".toRegex()
 
     init {
         // 信任过期证书
@@ -53,7 +47,7 @@ object Parser {
             )
         // Install the all-trusting trust manager
         runCatching {
-            val sc: SSLContext = SSLContext.getInstance("SSL")
+            val sc = SSLContext.getInstance("SSL")
             sc.init(null, trustAllCerts, SecureRandom())
             val sslsc = sc.serverSessionContext
             sslsc.sessionTimeout = 0
@@ -61,7 +55,7 @@ object Parser {
             HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
         }
             .getOrElse {
-                // if neede
+                // if needed
             }
     }
 
@@ -88,7 +82,6 @@ object Parser {
             }
         }
             .getOrElse {
-                println(uri)
                 "parseV2ray err".debug(uri)
                 null
             }
@@ -97,8 +90,9 @@ object Parser {
         "parseSs ".debug(uri)
         REG_SCHEMA_HASH.matchEntire(uri)?.run {
             val remark = groupValues[3].urlDecode()
+            "parseSs match".debug(remark)
             "parseSs match".debug(groupValues[2])
-            var decoded =
+            val decoded =
                 groupValues[2].takeUnless { it.contains("@") }?.b64Decode()
                 // 兼容异常
                 ?: with(groupValues[2]) {
@@ -176,7 +170,7 @@ object Parser {
                     Clash)
                 .proxies
                 .asSequence()
-                .mapNotNull(Node::toNode)
+                .map(Node::toNode)
                 .fold(linkedSetOf()) { acc, sub -> acc.also { acc.add(sub) } }
         else
             data
@@ -184,11 +178,11 @@ object Parser {
                 .split("\r\n|\n".toRegex())
                 .asSequence()
                 .filter { it.isNotEmpty() }
-                .mapNotNull { Pair(it, parse(it)) }
+                .map { Pair(it, parse(it)) }
                 .filterNot { it.second is NoSub }
                 .fold(linkedSetOf()) { acc, sub ->
                     sub.second?.let { acc.add(it) }
-                        ?: kotlin.run { println("parseFromFileSub failed: $sub") }
+                        ?: kotlin.run { println("parseFromFileSub $path failed: $sub") }
                     acc
                 }
     }
@@ -205,7 +199,7 @@ object Parser {
                         Clash)
                     .proxies
                     .asSequence()
-                    .mapNotNull(Node::toNode)
+                    .map(Node::toNode)
                     .filterNot { it is NoSub }
                     .fold(linkedSetOf<Sub>()) { acc, sub -> acc.also { acc.add(sub) } }
             else

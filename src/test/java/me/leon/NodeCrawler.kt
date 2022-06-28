@@ -1,5 +1,6 @@
 package me.leon
 
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -10,15 +11,9 @@ class NodeCrawler {
     companion object {
         private val nodeInfo = "$ROOT/info.md"
         val nodeInfoLocal = "$ROOT/info2.md"
-        private val adConfig = "$ROOT/ad.txt"
-        private val adReplaceConfig = "$ROOT/adreplace.txt"
-        const val customInfo = "防失效github.com/Leon406 "
+        const val customInfo = "防失效github SubCrawler"
         private var subCount = 0
         private var nodeCount = 0
-        val REG_AD by lazy { adConfig.toFile().readLines().joinToString("|").toRegex() }
-        val REG_AD_REPLACE by lazy {
-            adReplaceConfig.toFile().readLines().joinToString("|").toRegex().also { println(it) }
-        }
     }
 
     private val maps = linkedMapOf<String, LinkedHashSet<Sub>>()
@@ -28,9 +23,8 @@ class NodeCrawler {
     fun crawl() {
         // 1.爬取配置文件的订阅
         crawlNodes()
-        checkNodes()
+        //        checkNodes()
         nodeGroup()
-        //        IpFilterTest().reTestFailIps()
     }
 
     /** 爬取配置文件数据，并去重写入文件 */
@@ -38,7 +32,6 @@ class NodeCrawler {
     fun crawlNodes() {
         val subs1 = "$ROOT/pool/subpool".readLines()
         val subs2 = "$ROOT/pool/subs".readLines()
-        val unavailable = "$ROOT/pool/unavailable".readLines()
         //        val subs3 = "$SHARE2/tmp".readLines()
         val sublist = "$ROOT/pool/sublists".readLines()
         val subs3 =
@@ -47,13 +40,15 @@ class NodeCrawler {
                 .flatMap { it.split("\r\n|\n".toRegex()) }
                 .distinct()
                 .also { println("before ${it.size}") }
-                .filterNot { unavailable.contains(it) || it.startsWith("#") || it.trim().isEmpty() }
+                .filterNot { it.startsWith("#") || it.trim().isEmpty() }
                 .also {
                     println(it)
                     println("after ${it.size}")
                 }
-        val subs = (subs1 + subs2 + subs3).filterNot { unavailable.contains(it) }.toHashSet()
-
+        val subs = (subs1 + subs2 + subs3).toHashSet()
+        println(subs.size)
+        val prefix = SimpleDateFormat("MMdd").format(Date())
+        val countryMap = mutableMapOf<String, Int>()
         POOL.writeLine()
         runBlocking {
             subs
@@ -63,7 +58,12 @@ class NodeCrawler {
                     sub to
                         async(DISPATCHER) {
                             runCatching {
-                                Parser.parseFromSub(sub).also { println("$sub ${it.size} ") }
+                                val uri =
+                                    sub.takeUnless {
+                                        it.startsWith("https://raw.githubusercontent.com/")
+                                    }
+                                        ?: "https://ghproxy.com/$sub"
+                                Parser.parseFromSub(uri).also { println("$uri ${it.size} ") }
                             }
                                 .getOrElse {
                                     println("___parse failed $sub  ${it.message}")
@@ -76,20 +76,32 @@ class NodeCrawler {
                     maps[linkedHashSet.first] = linkedHashSet.second
                     acc.apply { acc.addAll(linkedHashSet.second) }
                 }
-                .sortedBy {
-                    it
-                        .apply {
-                            name =
-                                name.removeFlags()
-                                    .replace(REG_AD, "")
-                                    .replace(REG_AD_REPLACE, customInfo)
+                .also { nodeCount = it.size }
+                .filterNot { it.methodUnSupported() }
+                .map { it to async(DISPATCHER) { it.SERVER.quickConnect(it.serverPort, 2000) } }
+                .filter { it.second.await() > -1 }
+                .map {
+                    it.first.apply {
+                        with(this.ipCountryZh()) {
+                            countryMap[this] = countryMap.getOrDefault(this, 0) + 1
+                            name = "${this}_$prefix${"%03d".format(countryMap[this])}"
                         }
-                        .toUri()
+                    }
                 }
+                .sortedBy { it.name }
                 .also {
-                    POOL.writeLine(
-                        it.also { nodeCount = it.size }.joinToString("\n") { it.toUri() }
+                    nodeInfo.writeLine()
+                    // 2.筛选可用节点
+                    NODE_OK.writeLine()
+                    println(
+                        "有效节点: ${it.size}".also {
+                            nodeInfo.writeLine("更新时间${timeStamp()}\r\n")
+                            nodeInfo.writeLine("**总订阅: $subCount**")
+                            nodeInfo.writeLine("**总节点: $nodeCount**")
+                            nodeInfo.writeLine("**$it**")
+                        }
                     )
+                    NODE_OK.writeLine(it.joinToString("\n") { it.toUri() })
                 }
         }
     }
@@ -130,8 +142,10 @@ class NodeCrawler {
         NODE_SSR.writeLine()
         NODE_V2.writeLine()
         NODE_TR.writeLine()
+        val nodes = Parser.parseFromSub(NODE_OK)
+        NODE_ALL.writeLine(nodes.joinToString("\n") { it.toUri() }.b64Encode(), false)
 
-        Parser.parseFromSub(NODE_OK).groupBy { it.javaClass }.forEach { (clazz, subList) ->
+        nodes.groupBy { it.javaClass }.forEach { (clazz, subList) ->
             subList.firstOrNull()?.run { name = customInfo + name }
             val data = subList.joinToString("\n") { it.toUri() }.b64Encode()
             writeData(clazz, data, subList)

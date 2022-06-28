@@ -4,6 +4,7 @@ import java.io.File
 
 val ROOT = File("sub").absolutePath
 val SHARE = "$ROOT/share"
+val HOST = "$SHARE/host"
 val SHARE2 = "$ROOT/share/private"
 
 //        本地节点池
@@ -18,7 +19,8 @@ val NODE_SSR = "$SHARE/ssr"
 val NODE_SSR2 = "$SHARE2/ssr"
 val NODE_V2 = "$SHARE/v2"
 val NODE_V22 = "$SHARE2/v2"
-val NODE_ALL = "$SHARE2/all"
+val NODE_ALL2 = "$SHARE2/all"
+val NODE_ALL = "$SHARE/all"
 val NODE_TR = "$SHARE/tr"
 val NODE_TR2 = "$SHARE2/tr"
 val FAIL_IPS = "$ROOT/socketfail"

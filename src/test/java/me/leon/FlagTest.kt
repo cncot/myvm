@@ -10,17 +10,14 @@ class FlagTest {
 
         FlagRemover.remove("Relay_\uD83C\uDDE8\uD83C\uDDF3CN-\uD83C\uDDF8\uD83C\uDDECSG_1927")
             .also { println(it) }
-        //        SPEED_TEST_RESULT.readLines().also { println(it) }
-        //            .map { FlagRemover.remove(it) }
-        //            .also { println(it) }
-
     }
 
     @Test
     fun pool() {
-
-        Parser.parseFromSub(NODE_OK).map { println("${it.name} ${it.name.removeFlags()}") }
-        //            .forEach { println(it) }
-
+        Parser.parseFromSub(NODE_OK).map {
+            println(
+                "${it.name} ${it.name.removeFlags()}"
+            )
+        }
     }
 }
